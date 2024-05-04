@@ -1,0 +1,65 @@
+name: Run tests using Swift
+
+on:
+  workflow_call:
+    inputs:
+      matrix:
+        description: The strategy-matrix for OS, Xcode & Swift version
+        required: true
+        type: string
+      tracked-files:
+        description: The file paths to track changes
+        required: false
+        type: string
+        default: |
+          Sources/**/*.swift
+          Tests/**/*.swift
+          Package*.swift
+
+jobs:
+  swift-package:
+    name: On ${{ matrix.os }} with Swift ${{ matrix.swift }}
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      matrix: ${{ fromJSON(inputs.matrix) }}
+      
+    steps:
+      - name: Check whether to proceed running steps
+        id: precondition
+        uses: danthorpe/ci/actions/status@main
+        with:
+          files: ${{ inputs.tracked-files }}
+      
+      - name: Setup
+        if: steps.precondition.outputs.proceed == 'true'
+        uses: danthorpe/ci/actions/setup@main
+        with:
+          swift: ${{ matrix.swift }}
+          xcode: ${{ matrix.xcode }}
+
+      - name: Run tests
+        if: steps.precondition.outputs.proceed == 'true'
+        run: swift test --enable-code-coverage
+
+      - name: Report Coverage
+        if: |
+          steps.precondition.outputs.proceed == 'true' && 
+          (github.event_name == 'push' || github.event_name == 'pull_request')
+        continue-on-error: true
+        uses: danthorpe/ci/actions/lcov@main
+        with:
+          format: lcov
+          output-file: ./coverage.lcov
+
+      - name: Upload Coverage Report
+        if: |
+          steps.precondition.outputs.proceed == 'true' && 
+          (github.event_name == 'push' || github.event_name == 'pull_request')
+        continue-on-error: true
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
