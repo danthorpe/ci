@@ -1,0 +1,64 @@
+name: Setup
+description: Prepares CI for working with a Swift library
+inputs:
+  swift:
+    description: Swift version
+    required: false
+    default: latest
+  xcode:
+    description: Xcode version
+    required: false
+    default: latest-stable
+  platform:
+    description: The SDK Platform
+    required: false
+    default: iOS
+  command:
+    description: The command being executed
+    required: false
+    default: test
+runs:
+  using: composite
+  steps:
+    - name: Xcode
+      if: runner.os == 'macOS'
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: ${{ inputs.xcode }}
+    - name: Swift
+      if: inputs.swift != '' && (inputs.swift != 'latest' || runner.os != 'macOS')
+      uses: SwiftyLab/setup-swift@latest
+      with:
+        swift-version: ${{ inputs.swift }}
+        development: false
+    - name: Get swift version
+      shell: bash    
+      run: swift --version
+    - name: Get swift version in macOS
+      if: runner.os == 'macOS'
+      shell: bash
+      run: xcrun --toolchain ${{ env.TOOLCHAINS }} swift --version
+    - name: Cache Derived Data
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.derivedData
+        key: |
+          xcodebuild-deriveddata-v1-${{ inputs.platform }}-${{ inputs.xcode }}-${{ inputs.command }}-${{ hashFiles('**/Sources/**/*.swift', '**/Tests/**/*.swift') }}
+        restore-keys: |
+          xcodebuild-deriveddata-v1-${{ inputs.platform }}-${{ inputs.xcode }}-${{ inputs.command }}
+    - name: Bash
+      if: runner.os == 'macOS'
+      shell: bash
+      run: |
+        brew install bash
+        brew install gnu-sed
+        echo "/usr/local/bin" >> $GITHUB_PATH
+        echo "$(brew --prefix)/opt/gnu-sed/libexec/gnubin" >> $GITHUB_PATH
+    - name: Set IgnoreFileSystemDeviceInodeChanges flag
+      if: runner.os == 'macOS'
+      shell: bash
+      run: defaults write com.apple.dt.XCBuild IgnoreFileSystemDeviceInodeChanges -bool YES
+    - name: Update mtime for incremental builds 
+      uses: chetan/git-restore-mtime-action@v2          
+        

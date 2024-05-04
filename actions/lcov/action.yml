@@ -1,0 +1,26 @@
+name: Swift coverage
+description: Return lcov file
+inputs:
+  output-file:
+    description: The path to the output file
+    required: false
+    default: .build/debug/codecov/lcov.info
+  format:
+    description: The output file format
+    required: false
+    default: lcov
+runs:
+  using: composite
+  steps:
+    - name: Export Coverage
+      shell: bash
+      run: |
+        BIN_PATH="$(swift build --show-bin-path)"
+        XCTEST_PATH="$(find ${BIN_PATH} -name '*.xctest')"
+        PACKAGE_NAME="$(basename $XCTEST_PATH .xctest)"
+        COV_INPUT="${XCTEST_PATH}/Contents/MacOS/${PACKAGE_NAME}"
+        xcrun llvm-cov export \
+        -format=${{ inputs.format }} \
+        -instr-profile=.build/debug/codecov/default.profdata \
+        -ignore-filename-regex=".build|Tests" \
+        "${COV_INPUT}" > ${{ inputs.output-file }}

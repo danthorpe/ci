@@ -1,0 +1,73 @@
+name: Build Docs
+
+on:
+  workflow_call:
+    inputs:
+      os:
+        description: OS to build products for
+        required: false
+        type: string
+        default: ubuntu-latest
+      tracked-files:
+        description: Determine which files to check for changes
+        required: false
+        type: string
+        default: |-
+          **/Sources/**/*.swift
+          Sources/**/*.swift
+          Package*.swift
+      targets:
+        description: Swift package targets to build docs for as JSON array
+        required: false
+        type: string
+        default: "skip"
+      output-path:
+        description: The output directory for where the docs will be build
+        required: false
+        type: string
+        default: "docs-out"
+      basepath:
+        description: The hosting base path for docs
+        required: false
+        type: string
+        default: "skip"
+        
+    outputs:
+      release:
+        description: A release is required
+        value: ${{ jobs.docs.outputs.release }}
+
+jobs:
+  docs:
+    name: Build Docs
+    runs-on: ${{ inputs.os }}
+    outputs:
+      release: ${{ steps.check_version_bump.outputs.release_type == '' }}
+
+    steps:
+      - name: Check whether to continue
+        id: precondition
+        uses: danthorpe/ci/actions/status@main
+        with:
+          files: ${{ inputs.tracked-files }}
+
+      - name: Check version bump
+        if: steps.precondition.outputs.proceed == 'true'
+        id: check_version_bump
+        uses: mathieudutour/github-tag-action@v6.2
+        with:
+          github_token: ${{ github.token }}
+          default_bump: false
+          dry_run: true
+
+      - name: Setup
+        if: steps.precondition.outputs.proceed == 'true' && steps.check_version_bump.outputs.release_type == ''
+        uses: danthorpe/ci/actions/setup@main
+
+      - name: Build package documentation
+        if: steps.precondition.outputs.proceed == 'true' && steps.check_version_bump.outputs.release_type == '' && ${{ inputs.targets }} != "skip" && ${{ inputs.basepath }} != "skip"
+        uses: danthorpe/ci/actions/docs@main
+        with:
+          targets: ${{ inputs.targets }}          
+          basepath: ${{ inputs.basepath }}
+          output-path: ${{ inputs.output-path }}        

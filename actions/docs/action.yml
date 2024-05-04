@@ -1,0 +1,71 @@
+name: Build Docs
+description: Builds Swift Package docs
+inputs:
+  targets:
+    description: Swift package targets to build docs for as JSON array
+    required: false
+    default: "skip"
+  output-path:
+    description: The output directory for where the docs will be build
+    required: false
+    default: "docs-out"
+  basepath:
+    description: The hosting base path for docs
+    required: false
+    default: "skip"
+runs:
+  using: composite
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Checkout docs branch
+      uses: actions/checkout@v4
+      with:
+        ref: gh-pages
+        path: docs-out
+    
+    - name: Build
+      shell: bash
+      run: >
+        readarray -t targets < <(jq -c '.[]' <<< '${{ inputs.targets }}');
+        
+        rm -rf ${{ inputs.output-path }}/.git;
+        rm -rf ${{ inputs.output-path }}/main;
+        
+        for tag in $(echo "main"; git tag -l --sort=-v:refname | grep -e "\d\+\.\d\+.0" | head -1);
+        do
+          if [ -d "${{ inputs.output-path }}/$tag" ]; then
+              echo "✅ Documentation for $tag already exists.";
+          else
+            echo "⏳ Generating documentation for @ $tag release.";
+            rm -rf "${{ inputs.output-path }}/$tag";
+            git checkout .;
+            git checkout "$tag";
+            for item in "${targets[@]}"; do
+              target=$(echo $item | tr -d '"');
+              mkdir -p "${{ inputs.output-path }}/$tag/$target";
+              swift package \
+              --allow-writing-to-directory "${{ inputs.output-path }}/$tag/$target" \
+              generate-documentation --target $target \
+              --output-path "${{ inputs.output-path }}/$tag/$target" \
+              --transform-for-static-hosting \
+              --hosting-base-path /${{ inputs.basepath }}/$tag/$target \
+              && echo "✅ Documentation generated for $target @ $tag release." \
+              || echo "⚠️ Documentation skipped for $(target) @ $tag."
+            done
+          fi;
+        done
+      
+    - name: Fix permissions
+      shell: bash
+      run: 'sudo chown -R "$USER" docs-out'
+      
+    - name: Publish documentation to GitHub Pages
+      uses: JamesIves/github-pages-deploy-action@v4
+      with:
+        branch: gh-pages
+        folder: docs-out
+        single-commit: true

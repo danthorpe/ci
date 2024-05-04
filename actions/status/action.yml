@@ -1,0 +1,58 @@
+name: Check the status of a workflow
+description: Can be used to check whether a CI step should proceed.
+inputs:
+  workflow:
+    description: Workflow id to check
+    required: false
+    default: main.yml
+  files:
+    description: Check if there are changed files
+    required: true
+outputs:
+  proceed:
+    description: Continue running steps
+    value: ${{ steps.changed_files.outputs.any_changed == 'true' || !steps.status.outputs.results || (steps.last_status.outputs.result && fromJSON(steps.last_status.outputs.result).passed != 'true') }}
+runs:
+  using: composite
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        path: '.'
+    - name: Get last run
+      id: status
+      uses: actions/github-script@v7
+      env:
+        WORKFLOW: ${{ inputs.workflow }}
+      with:
+        result-encoding: json
+        script: |
+          const { GITHUB_HEAD_REF, GITHUB_REF_NAME, WORKFLOW } = process.env;
+          const branch = GITHUB_HEAD_REF ?? GITHUB_REF_NAME;
+          core.startGroup(`Checking last status for workflow \`${WORKFLOW}\` for branch \`${branch}\``);
+          const result = await github.rest.actions.listWorkflowRuns({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            workflow_id: WORKFLOW,
+            branch: branch,
+            per_page: 2,
+            page: 1
+          });
+          core.info(JSON.stringify(result));
+          core.endGroup();
+          const currentConclusion = result.data.workflow_runs[0]?.conclusion;
+          const success = (currentConclusion ? (currentConclusion === 'success') : true) &&
+            (result.data.workflow_runs[1]?.conclusion === 'success');
+          return {
+            passed: success,
+            sha: result.data.workflow_runs[1]?.head_sha,
+          };
+
+    - name: Check for changed files
+      if: steps.status.outputs.result && fromJSON(steps.status.outputs.result).passed == 'true'
+      id: changed_files
+      uses: tj-actions/changed-files@v44
+      with:
+        files: ${{ inputs.files }}
+        sha: ${{ fromJSON(steps.status.outputs.result).sha }}
