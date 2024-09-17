@@ -22,6 +22,17 @@ runs:
       uses: SwiftyLab/setup-swift@latest
       with:
         swift-version: ${{ inputs.swift }}
+        development: false
+        check-latest: true
+    - name: Cache Derived Data
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.derivedData
+        key: |
+          xcodebuild-deriveddata-v1-${{ inputs.platform }}-${{ inputs.xcode }}-${{ inputs.command }}-${{ hashFiles('**/Sources/**/*.swift', '**/Tests/**/*.swift') }}
+        restore-keys: |
+          xcodebuild-deriveddata-v1-${{ inputs.platform }}-${{ inputs.xcode }}-${{ inputs.command }}
     - name: Bash
       if: runner.os == 'macOS'
       shell: bash
@@ -30,3 +41,10 @@ runs:
         brew install gnu-sed
         echo "/usr/local/bin" >> $GITHUB_PATH
         echo "$(brew --prefix)/opt/gnu-sed/libexec/gnubin" >> $GITHUB_PATH
+    - name: Set IgnoreFileSystemDeviceInodeChanges flag
+      if: runner.os == 'macOS'
+      shell: bash
+      run: defaults write com.apple.dt.XCBuild IgnoreFileSystemDeviceInodeChanges -bool YES
+    - name: Update mtime for incremental builds 
+      uses: chetan/git-restore-mtime-action@v2          
+        
