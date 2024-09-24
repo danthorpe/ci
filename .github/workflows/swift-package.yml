@@ -18,7 +18,7 @@ on:
 
 jobs:
   swift-package:
-    name: On ${{ matrix.os }} with Swift ${{ matrix.swift }}
+    name: On ${{ matrix.os }} with Xcode ${{ matrix.xcode }} & Swift ${{ matrix.swift }}
     runs-on: ${{ matrix.os }}
     defaults:
       run:
