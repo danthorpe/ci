@@ -9,6 +9,14 @@ inputs:
     description: Xcode version
     required: false
     default: latest-stable
+  platform:
+    description: The SDK Platform
+    required: false
+    default: iOS
+  command:
+    description: The command being executed
+    required: false
+    default: test
 runs:
   using: composite
   steps:
@@ -19,11 +27,12 @@ runs:
         xcode-version: ${{ inputs.xcode }}
     - name: Swift
       if: inputs.swift != '' && (inputs.swift != 'latest' || runner.os != 'macOS')
-      uses: SwiftyLab/setup-swift@latest
+      uses: swift-actions/setup-swift@v2.1.0
       with:
         swift-version: ${{ inputs.swift }}
-        development: false
-        check-latest: true
+    - name: Get swift version
+      shell: bash    
+      run: swift --version
     - name: Cache Derived Data
       uses: actions/cache@v3
       with:
