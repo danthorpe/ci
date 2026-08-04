@@ -65,7 +65,7 @@ jobs:
         uses: danthorpe/ci/actions/setup@main
 
       - name: Build package documentation
-        if: steps.precondition.outputs.proceed == 'true' && steps.check_version_bump.outputs.release_type == '' && ${{ inputs.targets }} != "skip" && ${{ inputs.basepath }} != "skip"
+        if: steps.precondition.outputs.proceed == 'true' && steps.check_version_bump.outputs.release_type == '' && inputs.targets != 'skip' && inputs.basepath != 'skip'
         uses: danthorpe/ci/actions/docs@main
         with:
           targets: ${{ inputs.targets }}          
